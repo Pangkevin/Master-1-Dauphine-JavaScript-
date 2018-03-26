@@ -1,0 +1,5 @@
+<picture>
+<action type="rect" startX="144" startY="97" strokeStyle="blue" lineWidth="5" endX="300" endY="195" ></action>
+<action type="cycle" startX="225" startY="145" strokeStyle="green" lineWidth="5" endX="313" endY="208" ></action>
+<action type="line" startX="355" startY="55" strokeStyle="yellow" lineWidth="10" endX="104" endY="229" ></action>
+</picture>

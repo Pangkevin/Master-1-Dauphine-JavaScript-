@@ -35,7 +35,17 @@ startcoord.y = 0;
 var endcoord = new Object();
 endcoord.x = 0;
 endcoord.y = 0;
+
+// var XML
+
+var startX;
+var startY;
+
+var endX;
+var endY;
  
+ var color;
+ var thick;
 /-----------------------------------------------------------------------------------/  
  
 function clearboard(){
@@ -395,6 +405,127 @@ function Decreasethick(){
       }      
 }
  
+ /------------------------------------------------------------------------------------/
+ /****************************************XML*****************************************/
+
+// Initialise la lecture du fichier xml 
+ function readXMLfile(){
+
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+
+
+      if (this.readyState == 4 && this.status == 200) {
+          navigatesNodesXML(this);
+      }
+  };
+  // C'est ici qu'on met le nom du fichier XML
+  xhttp.open("GET", "test2.xml", true);
+  xhttp.send();
+
+ }
+
+ function getColor(nameColor){
+  switch (nameColor) {
+  case 'blue':
+    return "#0000ff";
+    break;
+    case 'red':
+    return "#ff0000";
+    break;
+    case 'green':
+    return "#00ff00";
+    break;
+    case 'yellow':
+    return "#ffff00";
+    break;
+  default:
+    return "#000000";
+}
+
+ }
+
+// Permet de parcourir le xml 
+ function navigatesNodesXML(xml){
+   var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+      var ctx=canvas.getContext("2d");
+      var rect = canvas.getBoundingClientRect();
+
+  var x, y, xmlDoc;
+  xmlDoc = xml.responseXML;
+  var i=0;
+  var expr;
+  // Parcours le dom
+  do {
+
+    x = xmlDoc.getElementsByTagName("action")[i];
+
+    // get l'attribut type pour avoir le type de dessin
+    expr = x.getAttribute("type");
+    startcoord.x = x.getAttribute("startX");
+    startcoord.y = x.getAttribute("startY");
+
+    ctx.strokeStyle = getColor(x.getAttribute("strokeStyle"));
+    ctx.lineWidth = getColor(x.getAttribute("lineWidth"));
+    ctx.beginPath();
+
+    endcoord.x = x.getAttribute("endX");
+    endcoord.y = x.getAttribute("endY");
+
+    switch (expr) {
+
+      case 'rect':
+
+        var length = endcoord.x  - startcoord.x
+        var width = endcoord.y - startcoord.x;
+
+        ctx.rect(startcoord.x,startcoord.y, length,width);
+        ctx.stroke();
+        ctx.closePath();
+
+        // Safe draw
+        saveDraw();
+       break;
+
+      case 'cycle':
+
+      
+  var rad = endcoord.x-startcoord.x
+ 
+  ctx.arc(startcoord.x,startcoord.y, Math.abs(rad),0,2*Math.PI);
+  ctx.stroke();
+  ctx.closePath();
+      break;
+    case 'line':
+
+      ctx.moveTo(startcoord.x,startcoord.y);
+      ctx.lineTo(endcoord.x, endcoord.y);
+      ctx.stroke();
+      ctx.closePath();
+    
+        break;
+    default:
+
+      
+      ctx.moveTo(x.children[0].getAttribute("startX"), x.children[0].getAttribute("startY"));
+      for(var j =1; j <= x.childElementCount-1; j++){
+      
+      ctx.lineTo(x.children[j].getAttribute("x"), x.children[j].getAttribute("y"));
+      ctx.stroke();
+
+      }
+      
+      ctx.closePath()
+
+}
+    i = i + 1;
+
+  } while (typeof x != 'undefined');
+     
+  }
+
+
  
 </script>
  
@@ -440,6 +571,7 @@ Paint !
     <td><input type="button" value="Clear" onclick="clearboard();" />
      <input type="button" value="Undo" onclick="undodraw();" id="undo" />
       <input type="button" value="Redo" onclick="redodraw();" /> </td>
+      <input type="button" value="xmlTest" onclick="readXMLfile();" /> </td>
   </tr>
  
 </table>
