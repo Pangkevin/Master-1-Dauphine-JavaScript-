@@ -36,7 +36,7 @@ var endcoord = new Object();
 endcoord.x = 0;
 endcoord.y = 0;
 
-// var XML
+// CI-dessous tous les variables pour le  XML
 
 var startX;
 var startY;
@@ -44,8 +44,28 @@ var startY;
 var endX;
 var endY;
  
+// Pour get les color et thick afin de les afficher dans chaque balise action du XML
  var color;
  var thick;
+
+// Cette variable va nous servir à concatener chaque case du tableau pour en faire un fichier xml 
+var textXmlSave="";
+var parser;
+var varxmlDoc;
+var itemXml;
+
+// Ce tableau permet se stocker chaque balise action dans une case pour permettre le undo
+var savedDrawsXml = [];
+
+
+var textSavePen = "";
+
+// C'est la variable qu'on va incrémenter pour la variable index dans la balise point lorsqu'on utilise le pen
+var indexPen = 0;
+
+// Lorsqu'on va contener l'ensemble des cases du tableau pour en faire un fichier XML, il faut bien que le
+//scripte commence par <picture>
+savedDrawsXml.push("<picture>");
 /-----------------------------------------------------------------------------------/  
  
 function clearboard(){
@@ -78,7 +98,11 @@ var img = finishedDraw[length-1];
 ctx.putImageData(img,0,0);
   }
 
-  console.log(finishedDraw.length);
+if(savedDrawsXml.pop() == "</picture>"){
+  savedDrawsXml.pop();
+  savedDrawsXml.push( "</picture>");
+}
+
 }
 /-----------------------------------------------------------------------------------/  
   
@@ -151,6 +175,8 @@ function getFirstPoint(e){
       booleanPen = true;
       ctx.beginPath();
       ctx.moveTo(startcoord.x, startcoord.y);
+
+      textSavePen += "<action type=\""+"pen"+"\"startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX="+ endcoord.x+" endY=\""+ endcoord.y+"\" ></action>"
   }
 
  else if  (document.getElementById('circ').checked) {
@@ -171,6 +197,10 @@ function getFirstPoint(e){
 // Dernier point, on recupère le point où on arrrete de cliquer
 function drawingEnd(e){
    var canvas=document.getElementById("gameboard");
+color = document.getElementById("color").value;
+thick = document.getElementById("Thick").value;
+
+
   if(!canvas.getContext){return;}
     var ctx=canvas.getContext("2d");
      
@@ -179,14 +209,14 @@ function drawingEnd(e){
         imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         booleanLine = false;
         drawline(e);
-     
+        addXmlSave("line");
     }
  
       if(booleanCircle){
         imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         booleanCircle = false;
         drawcircle(e);
-     
+        addXmlSave("cycle");
     }
  
    
@@ -194,7 +224,7 @@ function drawingEnd(e){
         imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         booleanRect = false;
         drawrect(e);
-       
+       addXmlSave("rect");
     }
  
       if(booleanPen){
@@ -202,6 +232,14 @@ function drawingEnd(e){
         booleanPen = false;
         drawpen(e);
         ctx.closePath()
+        textSavePen +="</action>"
+        savedDrawsXml.push(textSavePen);
+
+        // on remet la variable à vide
+
+        textSavePen ="";
+        indexPen  =0;
+
     }
  
  booleanFin = false;
@@ -258,6 +296,10 @@ if(booleanPen){
   
   ctx.strokeStyle = document.getElementById("color").value;
   ctx.lineWidth= document.getElementById("Thick").value;
+
+  textSavePen += "<point index=\""+indexPen+"\" x=\""+Xend+"\" y=\""+Yend+"\"/>";
+  indexPen++;
+
   ctx.lineTo(Xend, Yend);
   ctx.stroke();
   //ctx.closePath();
@@ -420,11 +462,13 @@ function Decreasethick(){
       }
   };
   // C'est ici qu'on met le nom du fichier XML
-  xhttp.open("GET", "test2.xml", true);
+  xhttp.open("GET", "testSave.xml", true);
   xhttp.send();
 
  }
 
+// Cette fonction permet juste de faire la correspondance nom de la coleur à son code. Car dans le fichier
+// xml du prof, les descriptions des couleurs se font avec leurs noms
  function getColor(nameColor){
   switch (nameColor) {
   case 'blue':
@@ -445,6 +489,28 @@ function Decreasethick(){
 
  }
 
+
+  function getColorByName(codeColor){
+  switch (codeColor) {
+  case '#0000ff':
+    return "blue";
+    break;
+    case "#ff0000":
+    return 'red';
+    break;
+    case "#00ff00":
+    return 'green';
+    break;
+    case "#ffff00":
+    return 'yellow';
+    break;
+  default:
+    return "black";
+}
+
+ }
+
+
 // Permet de parcourir le xml 
  function navigatesNodesXML(xml){
    var canvas=document.getElementById("gameboard");
@@ -459,6 +525,7 @@ function Decreasethick(){
   // Parcours le dom
   do {
 
+    console.log(x);
     x = xmlDoc.getElementsByTagName("action")[i];
 
     // get l'attribut type pour avoir le type de dessin
@@ -472,6 +539,7 @@ function Decreasethick(){
 
     endcoord.x = x.getAttribute("endX");
     endcoord.y = x.getAttribute("endY");
+    
 
     switch (expr) {
 
@@ -486,6 +554,7 @@ function Decreasethick(){
 
         // Safe draw
         saveDraw();
+
        break;
 
       case 'cycle':
@@ -496,6 +565,7 @@ function Decreasethick(){
   ctx.arc(startcoord.x,startcoord.y, Math.abs(rad),0,2*Math.PI);
   ctx.stroke();
   ctx.closePath();
+  saveDraw();
       break;
     case 'line':
 
@@ -503,11 +573,12 @@ function Decreasethick(){
       ctx.lineTo(endcoord.x, endcoord.y);
       ctx.stroke();
       ctx.closePath();
-    
+      saveDraw();
         break;
     default:
 
-      
+      //Dans la balise action de PEN, il y a beaucoup de balise fils, donc çela va nous permettre de les parcourir
+
       ctx.moveTo(x.children[0].getAttribute("startX"), x.children[0].getAttribute("startY"));
       for(var j =1; j <= x.childElementCount-1; j++){
       
@@ -517,16 +588,50 @@ function Decreasethick(){
       }
       
       ctx.closePath()
-
+      saveDraw();
 }
+    // Ajoute x qui contient la balise dans le tableau
+    savedDrawsXml.push(x.outerHTML);
     i = i + 1;
-
   } while (typeof x != 'undefined');
      
   }
 
+  function saveDrawXml(){
 
- 
+
+  // Faut pas l'appeler i et j pcq c'est reservé et que ça provoque des catastrophes
+
+  var  y = 0;
+
+  // Pour toujours avoir la balise de fin du script xml
+  if(savedDrawsXml[savedDrawsXml.length-2] == "</picture>"){
+    savedDrawsXml.splice(savedDrawsXml.length-1, 1);
+  }
+
+  textXmlSave = "";
+
+  for(y; y < savedDrawsXml.length; y++){
+
+    textXmlSave += savedDrawsXml[y]+'\r';
+
+  }
+
+  textXmlSave += "</picture>"
+  console.log(textXmlSave);
+   
+  }
+
+  function addXmlSave(itemForm){
+
+
+    savedDrawsXml.push("<action type=\""+itemForm+"\"startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX="+ endcoord.x+" endY=\""+ endcoord.y+"\" ></action>");
+
+
+    }
+
+
+
 </script>
  
 Paint !
@@ -551,11 +656,11 @@ Paint !
     <tr>
     <td>
     <select id="color">
-  <option value="#000000">Black</option>
-  <option value="#ff0000">Red</option>
-  <option value="#0000ff">Blue</option>
-  <option value="#00ff00">Green</option>
-  <option value="#ffff00">Yellow</option>
+  <option value="#000000">black</option>
+  <option value="#ff0000">red</option>
+  <option value="#0000ff">blue</option>
+  <option value="#00ff00">green</option>
+  <option value="#ffff00">yellow</option>
 </select>
 </td>
   </tr>
@@ -572,6 +677,7 @@ Paint !
      <input type="button" value="Undo" onclick="undodraw();" id="undo" />
       <input type="button" value="Redo" onclick="redodraw();" /> </td>
       <input type="button" value="xmlTest" onclick="readXMLfile();" /> </td>
+      <input type="button" value="SaveDraw" onclick="saveDrawXml();" /> </td>
   </tr>
  
 </table>
