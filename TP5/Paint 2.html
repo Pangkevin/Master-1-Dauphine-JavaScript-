@@ -266,6 +266,12 @@ function draw(){
  else if (document.getElementById('line').checked) {
        document.getElementById("gameboard").addEventListener("mousemove", drawline);
   }
+ else if (document.getElementById('move').checked) {
+    document.getElementById("gameboard").addEventListener('mousedown', move, false);
+    document.getElementById("gameboard").addEventListener('mousemove', drag, false);
+    document.getElementById("gameboard").addEventListener('mouseup', stopDragging, false);
+    document.getElementById("gameboard").addEventListener('mouseout', stopDragging, false);
+  }
     document.getElementById("gameboard").addEventListener("mouseup",  drawingEnd);
 
 }
@@ -447,6 +453,70 @@ function Decreasethick(){
       }      
 }
  
+ /-------------------------------------------------------------------------------------/
+ /*DRAG & DROP de cercle prédéfini*/
+ window.onload = function() {
+  drawCircletest(circle);
+ }
+    var deltaCenter = null;
+  function drawCircletest(circle) {
+    var canvas = document.getElementById('gameboard');
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.beginPath();
+    ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
+    ctx.fill();
+}
+  
+function mouseX(e) {
+return e.clientX - document.getElementById('gameboard').offsetLeft;
+}
+
+function mouseY(e) {
+return e.clientY - document.getElementById('gameboard').offsetTop;
+}
+
+var Point = function (xx, yy) {
+    this.x = xx;
+    this.y = yy;
+    return this;
+}
+
+var Circle = function (point, radius) {
+    this.point = point;
+    this.radius = radius;
+    this.isInside = function (pt) {
+        return Math.pow(pt.x - point.x, 2) + Math.pow(pt.y - point.y, 2) <
+                                                          Math.pow(radius, 2); 
+    };
+    return this;
+}
+
+//Permet de savoir quand commencer à deplacer
+function move(e) {
+    var p = new Point(e.offsetX, e.offsetY);
+    if(circle.isInside(p)) {
+        deltaCenter = new Point(p.x - circle.point.x, p.y - circle.point.y);
+    }
+}
+
+//refait le cercle à chaque mouvement  
+function drag(e) {
+    if(deltaCenter != null) {
+        circle.point.x = (mouseX(e) - deltaCenter.x);
+        circle.point.y = (mouseY(e) - deltaCenter.y);   
+        drawCircletest(circle);
+    }
+}
+
+//Permet d'arrêter de bouger  
+function stopDragging(e) {
+    deltaCenter = null;
+}
+var circle = new Circle(new Point(30, 40), 25);
+
+//Creation d'objet possible pour les forme mais pas pour le pencil
+  
  /------------------------------------------------------------------------------------/
  /****************************************XML*****************************************/
 
@@ -647,6 +717,8 @@ Paint !
   <tr>
     <th rowspan="4"> <canvas id="gameboard" width="500" height="500" > This is not supported!</canvas> </th>
     <td><form>
+  <input type="radio" name="tools" id = "move" value="move" onclick="draw();"> move<br>
+      <br>
   <input type="radio" name="tools" id = "pen" value="pencil" onclick="draw();"> pencil<br>
   <input type="radio" name="tools" id = "line" value="line" onclick="draw();"> line<br>
   <input type="radio" name="tools" id = "circ" value="circle" onclick="draw();"> circle<br>
