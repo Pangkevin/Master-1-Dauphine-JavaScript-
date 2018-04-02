@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html>
+<head> <title> Paint ! </title> </head>
+<body>
+ 
+<script>
+var thick;
+var canvas ;
+var ctx ;
+var imageData ;
+ 
+ 
+// Pour savoir si on arrête de dessiner définitivement la droite
+var booleanLine = false;
+var booleanCircle = false;
+var booleanRect = false;
+var booleanPen = false;
+var booleanFin = false;
+ 
+ 
+// Permet d'update la modif canvas car on clean a chaque fois qu'on dessine
+var savedDraws = [];
+var imgData = null;
+var finishedDraw = [];
+var finishedDrawUndo = [];
+var undocount = 1;
+
+
+//Start object
+var startcoord = new Object();
+startcoord.x = 0;
+startcoord.y = 0;
+ 
+//End object
+var endcoord = new Object();
+endcoord.x = 0;
+endcoord.y = 0;
+
+// CI-dessous tous les variables pour le  XML
+
+var startX;
+var startY;
+
+var endX;
+var endY;
+ 
+// Pour get les color et thick afin de les afficher dans chaque balise action du XML
+ var color;
+ var thick;
+
+// Cette variable va nous servir à concatener chaque case du tableau pour en faire un fichier xml 
+var textXmlSave="";
+var parser;
+var varxmlDoc;
+var itemXml;
+
+// Ce tableau permet se stocker chaque balise action dans une case pour permettre le undo
+var savedDrawsXml = [];
+
+
+var textSavePen = "";
+
+// C'est la variable qu'on va incrémenter pour la variable index dans la balise point lorsqu'on utilise le pen
+var indexPen = 0;
+
+// Lorsqu'on va contener l'ensemble des cases du tableau pour en faire un fichier XML, il faut bien que le
+//scripte commence par <picture>
+savedDrawsXml.push("<picture>");
+
+// Drag
+
+var isDragging = false;
+// 
+/-----------------------------------------------------------------------------------/  
+ 
+function clearboard(){
+  var canvas=document.getElementById("gameboard");
+  if(!canvas.getContext){return;}
+ 
+  //Board
+  var ctx=canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+/-----------------------------------------------------------------------------------/  
+function undodraw(){
+
+  // Cette condition evite de décrémenter au dessous de 0 car cela pose des problèmes lorsqu'on veut
+  // faire un redo ou re-undo
+  if(finishedDraw.length <= 1){
+    return 0;
+  }
+
+var ctx=canvas.getContext("2d");
+   if  (typeof finishedDraw[finishedDraw.length-1] !== 'undefined')
+ {
+  finishedDrawUndo.push(finishedDraw.pop());
+ var length = finishedDraw.length;
+   
+var img = finishedDraw[length-1];
+  // undocount = undocount + 1;
+ }
+  if (img != null){
+ctx.putImageData(img,0,0);
+  }
+
+if(savedDrawsXml.pop() == "</picture>"){
+  savedDrawsXml.pop();
+  savedDrawsXml.push( "</picture>");
+}
+
+}
+/-----------------------------------------------------------------------------------/  
+  
+function redodraw(){
+  var ctx=canvas.getContext("2d");
+  var length = finishedDraw.length;
+
+  // Cette condition permet d'éviter les push lorsque la longueur du tableau finishedDrawUndo
+  // est inférieur à 1. En règle général, ça permet de casser la fonctionnalité lorsque que l'utilisateur
+  //spam le bouton 
+  if(finishedDrawUndo.length >=1){
+    finishedDraw.push(finishedDrawUndo.pop());
+    var img = finishedDraw[length];
+    if (img != null)
+      ctx.putImageData(img,0,0);
+  } else{
+      return 0;
+  }
+ 
+
+  console.log(finishedDraw.length);
+  console.log("++"+finishedDrawUndo.length);
+}
+/-----------------------------------------------------------------------------------/  
+ 
+
+ function restoreCanvas(){
+
+  var ctx=canvas.getContext("2d");
+  var length = savedDraws.length;
+  var img = savedDraws[length-1];
+  if (img != null)
+    ctx.putImageData(img,0,0);
+
+ }
+
+ function saveCanvas(){
+  var canvas=document.getElementById("gameboard");
+  var ctx=canvas.getContext("2d");
+  var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  savedDraws.push(img);
+ }
+
+ function saveDraw(){
+   var canvas=document.getElementById("gameboard");
+  var ctx=canvas.getContext("2d");
+  var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  finishedDraw.push(img);
+ }
+
+// Premier point, on recupère le point où on clique
+function getFirstPoint(e){
+  canvas=document.getElementById("gameboard");
+  var ctx=canvas.getContext("2d");
+  var rect = canvas.getBoundingClientRect();
+  var X = e.clientX - rect.left;
+  var Y = e.clientY - rect.top; // Pos Y
+
+  startcoord.x = X;
+  startcoord.y = Y;
+
+  if (document.getElementById('pen').checked) {
+      booleanPen = true;
+      ctx.beginPath();
+      ctx.moveTo(startcoord.x, startcoord.y);
+
+      textSavePen += "<action type=\""+"pen"+"\"startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX="+ endcoord.x+" endY=\""+ endcoord.y+"\" ></action>"
+  }
+
+ else if  (document.getElementById('circ').checked) {
+     booleanCircle = true;
+  }
+ else if  (document.getElementById('rect').checked) {
+  booleanRect = true;
+     
+  }
+ else if (document.getElementById('line').checked) {
+  booleanLine = true;
+  }
+  booleanFin = true;
+}
+ 
+/-----------------------------------------------------------------------------------/  
+ 
+// Dernier point, on recupère le point où on arrrete de cliquer
+function drawingEnd(e){
+   var canvas=document.getElementById("gameboard");
+color = document.getElementById("color").value;
+thick = document.getElementById("Thick").value;
+
+
+  if(!canvas.getContext){return;}
+    var ctx=canvas.getContext("2d");
+     
+
+    if(booleanLine){
+        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        booleanLine = false;
+        drawline(e);
+        addXmlSave("line");
+    }
+ 
+      if(booleanCircle){
+        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        booleanCircle = false;
+        drawcircle(e);
+        addXmlSave("cycle");
+    }
+ 
+   
+      if(booleanRect){
+        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        booleanRect = false;
+        drawrect(e);
+       addXmlSave("rect");
+    }
+ 
+      if(booleanPen){
+   
+        booleanPen = false;
+        drawpen(e);
+        ctx.closePath()
+        textSavePen +="</action>"
+        savedDrawsXml.push(textSavePen);
+
+        // on remet la variable à vide
+
+        textSavePen ="";
+        indexPen  =0;
+
+    }
+ 
+ booleanFin = false;
+  saveDraw();
+  saveDrawXml();
+ 
+}
+ 
+/-----------------------------------------------------------------------------------/  
+ 
+function draw(){
+
+  //ctx.clearRect(0,0,canvas.width,canvas.height);
+
+
+  document.getElementById("gameboard").addEventListener("mousedown", getFirstPoint);
+ 
+  if (document.getElementById('pen').checked) {
+    document.getElementById("gameboard").addEventListener("mousemove", drawpen);
+  }
+ else if  (document.getElementById('circ').checked) {
+    document.getElementById("gameboard").addEventListener("mousemove", drawcircle);
+  }
+ else if  (document.getElementById('rect').checked) {
+       document.getElementById("gameboard").addEventListener("mousemove", drawrect);
+  }
+ else if (document.getElementById('line').checked) {
+       document.getElementById("gameboard").addEventListener("mousemove", drawline);
+  }
+ else if (document.getElementById('move').checked) {
+    document.getElementById("gameboard").addEventListener('mousedown', move, false);
+    document.getElementById("gameboard").addEventListener('mousemove', drag, false);
+    document.getElementById("gameboard").addEventListener('mouseup', stopDragging, false);
+    document.getElementById("gameboard").addEventListener('mouseout', stopDragging, false);
+  }
+    document.getElementById("gameboard").addEventListener("mouseup",  drawingEnd);
+
+}
+ 
+/-----------------------------------------------------------------------------------/        
+   function drawpen(e){
+  var canvas=document.getElementById("gameboard");
+
+    if(!canvas.getContext){return;}
+  var ctx=canvas.getContext("2d");
+  var rect = canvas.getBoundingClientRect();
+ 
+  var Xend = e.clientX - rect.left;
+  var Yend = e.clientY - rect.top; // Pos Y
+  if(!canvas.getContext){
+    return;
+  }
+ 
+   if(!booleanFin){
+    saveCanvas();
+    return;
+  }
+if(booleanPen){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  restoreCanvas();
+ 
+  
+  ctx.strokeStyle = document.getElementById("color").value;
+  ctx.lineWidth= document.getElementById("Thick").value;
+
+  textSavePen += "<point index=\""+indexPen+"\" x=\""+Xend+"\" y=\""+Yend+"\"/>";
+  indexPen++;
+
+  ctx.lineTo(Xend, Yend);
+  ctx.stroke();
+  //ctx.closePath();
+          }
+   }
+/-----------------------------------------------------------------------------------/    
+    function drawrect(e){
+
+      var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+      var ctx=canvas.getContext("2d");
+        var rect = canvas.getBoundingClientRect();
+     
+  if(!booleanFin){
+    saveCanvas();
+    return;
+  }
+
+if(booleanRect){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  restoreCanvas();
+
+
+  ctx.strokeStyle = document.getElementById("color").value;
+  ctx.lineWidth= document.getElementById("Thick").value;
+  ctx.beginPath();
+        // Init radius
+  endcoord.x = e.clientX - rect.left;
+  endcoord.y = e.clientY - rect.top;
+  var length = endcoord.x-startcoord.x
+  var width = endcoord.y - startcoord.x;
+  ctx.rect(startcoord.x,startcoord.y, length,width);
+  ctx.stroke();
+  ctx.closePath();
+    
+ 
+   }
+    }
+ 
+/-----------------------------------------------------------------------------------/  
+ 
+    function drawcircle(e){
+  var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+  var ctx=canvas.getContext("2d");
+  var rect = canvas.getBoundingClientRect();
+     
+  if(!booleanFin){
+    saveCanvas();
+    return;
+  }
+ if(booleanCircle){
+
+
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  restoreCanvas();
+
+  ctx.strokeStyle = document.getElementById("color").value;
+  ctx.lineWidth= document.getElementById("Thick").value;
+  ctx.beginPath();
+        // Init radius
+  endcoord.x = e.clientX - rect.left;
+  var rad = endcoord.x-startcoord.x
+ 
+  ctx.arc(startcoord.x,startcoord.y, Math.abs(rad),0,2*Math.PI);
+  ctx.stroke();
+  ctx.closePath();
+      
+           }
+   }
+   
+/-----------------------------------------------------------------------------------/  
+ 
+   // Quand la souris bouge, on dessine la droite automatiquement
+function drawline(e){
+  // Si j'ai mouseup la souris, on arrête de modifier la droite
+  var canvas=document.getElementById("gameboard");
+  var ctx=canvas.getContext("2d");
+  var rect = canvas.getBoundingClientRect();
+ 
+  if(!canvas.getContext){
+  
+    return;
+  }
+ 
+  if(!booleanFin){
+    saveCanvas();
+    return;
+  }
+ 
+  if(booleanLine){
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  restoreCanvas();
+
+  // Epaisseur de la droite
+  ctx.strokeStyle = document.getElementById("color").value;
+  ctx.lineWidth= document.getElementById("Thick").value;
+  ctx.beginPath();
+  ctx.moveTo(startcoord.x,startcoord.y);
+ 
+  // Init point de fin
+  endcoord.x = e.clientX - rect.left;
+  endcoord.y = e.clientY - rect.top;
+  ctx.lineTo(endcoord.x, endcoord.y);
+  ctx.stroke();
+  ctx.closePath();
+ 
+      }
+
+ 
+   }
+
+/-----------------------------------------------------------------------------------/  
+ 
+function drawgameboard(){
+  savedraw();
+  var canvas=document.getElementById("gameboard");
+  if(!canvas.getContext){return;}
+ 
+  draw();
+ 
+  //Board
+  var ctx=canvas.getContext("2d");
+  ctx.fillStyle = "#FFFFFF";
+  ctx.clearRect(0,0,500,500);
+  ctx.fillRect(0,0,500,500);
+ 
+}
+/-----------------------------------------------------------------------------------/  
+ 
+function Increasethick(){
+var Thickness = document.getElementById("Thick");
+        Thickness.value ++;
+      }
+/-----------------------------------------------------------------------------------/  
+     
+function Decreasethick(){
+        var Thickness = document.getElementById("Thick");
+        if (Thickness.value >1){
+        Thickness.value --;
+        } else {
+        Thickness.value = Thickness.value;
+      }      
+}
+ 
+ /-------------------------------------------------------------------------------------/
+ /*DRAG & DROP de cercle prédéfini*/
+ //window.onload = function() {
+  //drawCircletest(circle);
+ //}
+
+  var deltaCenter = null;
+  var circle;
+  var p;
+
+//Creation d'objet possible pour les forme mais pas pour le pencil
+ function drawCircletest(circle) {
+    var canvas = document.getElementById('gameboard');
+    var ctx = canvas.getContext('2d');
+    if(!isDragging){
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      restoreCanvas();
+     
+      ctx.beginPath();
+      ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
+      ctx.stroke();
+      ctx.closePath();
+
+    }else{
+
+
+      ctx.beginPath();
+      //drawCircletest(circle);
+      //ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
+      ctx.fillStyle ="white";
+      ctx.fill();
+   
+      ctx.closePath();
+      imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      saveCanvas();
+      saveDraw();
+     
+    }
+}
+  
+function mouseX(e) {
+return e.clientX - document.getElementById('gameboard').offsetLeft;
+}
+
+function mouseY(e) {
+return e.clientY - document.getElementById('gameboard').offsetTop;
+}
+
+var Point = function (xx, yy) {
+    this.x = xx;
+    this.y = yy;
+    return this;
+}
+
+var Circle = function (point, radius) {
+    this.point = point;
+    this.radius = radius;
+    this.isInside = function (pt) {
+        return Math.pow(pt.x - point.x, 2) + Math.pow(pt.y - point.y, 2) <
+                                                          Math.pow(radius, 2); 
+    };
+
+    return this;
+}
+
+//Permet de savoir quand commencer à deplacer
+function move(e) {
+
+    var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+    var ctx=canvas.getContext("2d");
+    var rect = canvas.getBoundingClientRect();
+
+
+    var p = new Point(e.offsetX, e.offsetY);
+    
+  var cptTab;
+  var stringToXMl;
+  var parser = new DOMParser();
+  var actionTag;
+  var typeItem;
+
+  // Pour le cercle
+  var radiusForCircle
+   var param2Radius 
+// on demarre à 1 car la premiere cas est dédié à la balise <pictur>
+for(cptTab =1; cptTab < savedDrawsXml.length ; cptTab++){
+
+   stringToXMl = parser.parseFromString(savedDrawsXml[cptTab],"text/xml");
+
+    console.log(stringToXMl.getElementsByTagName("action")[0].getAttribute("type"));
+    actionTag = stringToXMl.getElementsByTagName("action")[0].getAttribute("type");
+    // Pour chaque case, je parse le string en xml
+       switch (actionTag) {
+
+      case 'pen':
+
+
+       break;
+
+    default:
+    
+    startcoord.x = stringToXMl.getElementsByTagName("action")[0].getAttribute("startX");
+    startcoord.y = stringToXMl.getElementsByTagName("action")[0].getAttribute("startY");
+
+    endcoord.x = stringToXMl.getElementsByTagName("action")[0].getAttribute("endX");
+    endcoord.y = stringToXMl.getElementsByTagName("action")[0].getAttribute("endY");
+
+    radiusForCircle = endcoord.x-startcoord.x;
+
+   param2Radius = Math.abs(radiusForCircle);
+
+    circle = new Circle(new Point(startcoord.x , startcoord.y), param2Radius);
+
+    if(circle.isInside(p)) {
+
+        // Dessine le cercle en blanc
+      isDragging = true;
+      drawCircletest(circle);
+      isDragging = false;
+
+      console.log(circle);
+      console.log(savedDrawsXml[cptTab]);
+
+      deltaCenter = new Point(p.x - circle.point.x, p.y - circle.point.y);
+      savedDrawsXml.splice(cptTab, 1);
+      break;
+    }
+    
+}
+
+  }
+}
+
+//refait le cercle à chaque mouvement  
+function drag(e) {
+
+  var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+  var ctx=canvas.getContext("2d");
+
+  var rect = canvas.getBoundingClientRect();
+    if(deltaCenter != null) {
+        circle.point.x = (mouseX(e) - deltaCenter.x);
+        circle.point.y = (mouseY(e) - deltaCenter.y); 
+
+        drawCircletest(circle);
+
+    }
+}
+
+//Permet d'arrêter de bouger  
+function stopDragging(e) {
+    deltaCenter = null;
+      
+}
+
+ /------------------------------------------------------------------------------------/
+ /****************************************XML*****************************************/
+
+// Initialise la lecture du fichier xml 
+ function readXMLfile(){
+
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+
+
+      if (this.readyState == 4 && this.status == 200) {
+          navigatesNodesXML(this);
+      }
+  };
+  // C'est ici qu'on met le nom du fichier XML
+  xhttp.open("GET", "testSave.xml", true);
+  xhttp.send();
+
+ }
+
+// Cette fonction permet juste de faire la correspondance nom de la coleur à son code. Car dans le fichier
+// xml du prof, les descriptions des couleurs se font avec leurs noms
+ function getColor(nameColor){
+  switch (nameColor) {
+  case 'blue':
+    return "#0000ff";
+    break;
+    case 'red':
+    return "#ff0000";
+    break;
+    case 'green':
+    return "#00ff00";
+    break;
+    case 'yellow':
+    return "#ffff00";
+    break;
+  default:
+    return "#000000";
+}
+
+ }
+
+
+  function getColorByName(codeColor){
+  switch (codeColor) {
+  case '#0000ff':
+    return "blue";
+    break;
+    case "#ff0000":
+    return 'red';
+    break;
+    case "#00ff00":
+    return 'green';
+    break;
+    case "#ffff00":
+    return 'yellow';
+    break;
+  default:
+    return "black";
+}
+
+ }
+
+
+// Permet de parcourir le xml 
+ function navigatesNodesXML(xml){
+   var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+      var ctx=canvas.getContext("2d");
+      var rect = canvas.getBoundingClientRect();
+
+  var x, y, xmlDoc;
+  xmlDoc = xml.responseXML;
+  var i=0;
+  var expr;
+  // Parcours le dom
+  do {
+
+    console.log(x);
+    x = xmlDoc.getElementsByTagName("action")[i];
+
+    // get l'attribut type pour avoir le type de dessin
+    expr = x.getAttribute("type");
+    startcoord.x = x.getAttribute("startX");
+    startcoord.y = x.getAttribute("startY");
+
+    ctx.strokeStyle = getColor(x.getAttribute("strokeStyle"));
+    ctx.lineWidth = getColor(x.getAttribute("lineWidth"));
+    ctx.beginPath();
+
+    endcoord.x = x.getAttribute("endX");
+    endcoord.y = x.getAttribute("endY");
+    
+
+    switch (expr) {
+
+      case 'rect':
+
+        var length = endcoord.x  - startcoord.x
+        var width = endcoord.y - startcoord.x;
+
+        ctx.rect(startcoord.x,startcoord.y, length,width);
+        ctx.stroke();
+        ctx.closePath();
+
+        // Safe draw
+        saveDraw();
+
+       break;
+
+      case 'cycle':
+
+      
+  var rad = endcoord.x-startcoord.x
+ 
+  ctx.arc(startcoord.x,startcoord.y, Math.abs(rad),0,2*Math.PI);
+  ctx.stroke();
+  ctx.closePath();
+  saveDraw();
+      break;
+    case 'line':
+
+      ctx.moveTo(startcoord.x,startcoord.y);
+      ctx.lineTo(endcoord.x, endcoord.y);
+      ctx.stroke();
+      ctx.closePath();
+      saveDraw();
+        break;
+    default:
+
+      //Dans la balise action de PEN, il y a beaucoup de balise fils, donc çela va nous permettre de les parcourir
+
+      ctx.moveTo(x.children[0].getAttribute("startX"), x.children[0].getAttribute("startY"));
+      for(var j =1; j <= x.childElementCount-1; j++){
+      
+      ctx.lineTo(x.children[j].getAttribute("x"), x.children[j].getAttribute("y"));
+      ctx.stroke();
+
+      }
+      
+      ctx.closePath()
+      saveDraw();
+}
+    // Ajoute x qui contient la balise dans le tableau
+    savedDrawsXml.push(x.outerHTML);
+    i = i + 1;
+  } while (typeof x != 'undefined');
+
+    saveDrawXml();
+     
+  }
+
+  function saveDrawXml(){
+
+
+  // Faut pas l'appeler i et j pcq c'est reservé et que ça provoque des catastrophes
+
+  var  y = 0;
+
+  // Pour toujours avoir la balise de fin du script xml
+  if(savedDrawsXml[savedDrawsXml.length-2] == "</picture>"){
+    savedDrawsXml.splice(savedDrawsXml.length-1, 1);
+  }
+
+  textXmlSave = "";
+
+  for(y; y < savedDrawsXml.length; y++){
+
+    textXmlSave += savedDrawsXml[y]+'\r';
+
+  }
+
+  textXmlSave += "</picture>"
+
+  // Faut appuyer sur F12 puis console pour pouvoir voir le xml qu'on a save
+  console.log(textXmlSave);
+   
+  }
+
+
+
+  function addXmlSave(itemForm){
+
+
+    savedDrawsXml.push("<action type=\""+itemForm+"\" startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX=\""+ endcoord.x+"\" endY=\""+ endcoord.y+"\" ></action>");
+
+
+    }
+
+</script>
+ 
+Paint !
+<br/>
+ 
+ 
+<br/>
+<table border="1">
+  <tr>
+    <th>Canvas</th>
+    <th>Tools</th>
+  </tr>
+  <tr>
+    <th rowspan="4"> <canvas id="gameboard" width="500" height="500" > This is not supported!</canvas> </th>
+    <td><form>
+  <input type="radio" name="tools" id = "move" value="move" onclick="draw();"> move<br>
+  <input type="radio" name="tools" id = "pen" value="pencil" onclick="draw();"> pencil<br>
+  <input type="radio" name="tools" id = "line" value="line" onclick="draw();"> line<br>
+  <input type="radio" name="tools" id = "circ" value="circle" onclick="draw();"> circle<br>
+  <input type="radio" name="tools" id = "rect" value="rectangle" onclick="draw();"> rectangle
+</form></td>
+  </tr>
+    <tr>
+    <td>
+    <select id="color">
+  <option value="#000000">black</option>
+  <option value="#ff0000">red</option>
+  <option value="#0000ff">blue</option>
+  <option value="#00ff00">green</option>
+  <option value="#ffff00">yellow</option>
+</select>
+</td>
+  </tr>
+    <tr>
+    <td>
+    <input type="text" id="Thick" readonly="readonly" value = 1 >
+    <br>
+    <input type="button" value="-" onclick="Decreasethick();" />
+    <input type="button" value="+" onclick="Increasethick();" />
+    </td>
+  </tr>
+    <tr>
+    <td><input type="button" value="Clear" onclick="clearboard();" />
+     <input type="button" value="Undo" onclick="undodraw();" id="undo" />
+      <input type="button" value="Redo" onclick="redodraw();" /> </td>
+      <input type="button" value="xmlTest" onclick="readXMLfile();" /> </td>
+    <!--  <input type="button" value="SaveDraw" onclick="saveDrawXml();" /> </td> -->
+
+  </tr>
+
+ 
+</table>
+
+
+</body>
+</html>
