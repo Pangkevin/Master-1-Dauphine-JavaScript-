@@ -66,6 +66,11 @@ var indexPen = 0;
 // Lorsqu'on va contener l'ensemble des cases du tableau pour en faire un fichier XML, il faut bien que le
 //scripte commence par <picture>
 savedDrawsXml.push("<picture>");
+
+// Drag
+
+var isDragging = false;
+// 
 /-----------------------------------------------------------------------------------/  
  
 function clearboard(){
@@ -151,13 +156,6 @@ function redodraw(){
   var ctx=canvas.getContext("2d");
   var img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   finishedDraw.push(img);
-  //if(indexSave != finishedDraw.length-1 && typeof finishedDraw[indexSave+1] !== 'undefined'){
-   //for (i = indexSave; i <= finishedDraw.length; i++){
-      //lert("suppression") 
-    //inishedDraw.pop();
-  //
-   //
-   //dexSave = finishedDraw.length; 
  }
 
 // Premier point, on recupère le point où on clique
@@ -244,6 +242,7 @@ thick = document.getElementById("Thick").value;
  
  booleanFin = false;
   saveDraw();
+  saveDrawXml();
  
 }
  
@@ -252,6 +251,8 @@ thick = document.getElementById("Thick").value;
 function draw(){
 
   //ctx.clearRect(0,0,canvas.width,canvas.height);
+
+
   document.getElementById("gameboard").addEventListener("mousedown", getFirstPoint);
  
   if (document.getElementById('pen').checked) {
@@ -455,17 +456,45 @@ function Decreasethick(){
  
  /-------------------------------------------------------------------------------------/
  /*DRAG & DROP de cercle prédéfini*/
- window.onload = function() {
-  drawCircletest(circle);
- }
-    var deltaCenter = null;
-  function drawCircletest(circle) {
+ //window.onload = function() {
+  //drawCircletest(circle);
+ //}
+
+  var deltaCenter = null;
+  var circle;
+  var p;
+
+//Creation d'objet possible pour les forme mais pas pour le pencil
+ function drawCircletest(circle) {
     var canvas = document.getElementById('gameboard');
     var ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.beginPath();
-    ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
-    ctx.fill();
+    if(!isDragging){
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      restoreCanvas();
+     
+      ctx.beginPath();
+      ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
+      ctx.stroke();
+      ctx.closePath();
+
+    }else{
+
+
+      ctx.beginPath();
+      //drawCircletest(circle);
+      //ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
+      ctx.fillStyle ="white";
+      ctx.fill();
+   
+      ctx.closePath();
+      imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      saveCanvas();
+      saveDraw();
+     
+    }
 }
   
 function mouseX(e) {
@@ -489,34 +518,102 @@ var Circle = function (point, radius) {
         return Math.pow(pt.x - point.x, 2) + Math.pow(pt.y - point.y, 2) <
                                                           Math.pow(radius, 2); 
     };
+
     return this;
 }
 
 //Permet de savoir quand commencer à deplacer
 function move(e) {
+
+    var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+    var ctx=canvas.getContext("2d");
+    var rect = canvas.getBoundingClientRect();
+
+
     var p = new Point(e.offsetX, e.offsetY);
+    
+  var cptTab;
+  var stringToXMl;
+  var parser = new DOMParser();
+  var actionTag;
+  var typeItem;
+
+  // Pour le cercle
+  var radiusForCircle
+   var param2Radius 
+// on demarre à 1 car la premiere cas est dédié à la balise <pictur>
+for(cptTab =1; cptTab < savedDrawsXml.length ; cptTab++){
+
+   stringToXMl = parser.parseFromString(savedDrawsXml[cptTab],"text/xml");
+
+    console.log(stringToXMl.getElementsByTagName("action")[0].getAttribute("type"));
+    actionTag = stringToXMl.getElementsByTagName("action")[0].getAttribute("type");
+    // Pour chaque case, je parse le string en xml
+       switch (actionTag) {
+
+      case 'pen':
+
+
+       break;
+
+    default:
+    
+    startcoord.x = stringToXMl.getElementsByTagName("action")[0].getAttribute("startX");
+    startcoord.y = stringToXMl.getElementsByTagName("action")[0].getAttribute("startY");
+
+    endcoord.x = stringToXMl.getElementsByTagName("action")[0].getAttribute("endX");
+    endcoord.y = stringToXMl.getElementsByTagName("action")[0].getAttribute("endY");
+
+    radiusForCircle = endcoord.x-startcoord.x;
+
+   param2Radius = Math.abs(radiusForCircle);
+
+    circle = new Circle(new Point(startcoord.x , startcoord.y), param2Radius);
+
     if(circle.isInside(p)) {
-        deltaCenter = new Point(p.x - circle.point.x, p.y - circle.point.y);
+
+        // Dessine le cercle en blanc
+      isDragging = true;
+      drawCircletest(circle);
+      isDragging = false;
+
+      console.log(circle);
+      console.log(savedDrawsXml[cptTab]);
+
+      deltaCenter = new Point(p.x - circle.point.x, p.y - circle.point.y);
+      savedDrawsXml.splice(cptTab, 1);
+      break;
     }
+    
+}
+
+  }
 }
 
 //refait le cercle à chaque mouvement  
 function drag(e) {
+
+  var canvas=document.getElementById("gameboard");
+    if(!canvas.getContext){return;}
+  var ctx=canvas.getContext("2d");
+
+  var rect = canvas.getBoundingClientRect();
     if(deltaCenter != null) {
         circle.point.x = (mouseX(e) - deltaCenter.x);
-        circle.point.y = (mouseY(e) - deltaCenter.y);   
+        circle.point.y = (mouseY(e) - deltaCenter.y); 
+
         drawCircletest(circle);
+
     }
 }
 
 //Permet d'arrêter de bouger  
 function stopDragging(e) {
     deltaCenter = null;
+      
 }
-var circle = new Circle(new Point(30, 40), 25);
 
-//Creation d'objet possible pour les forme mais pas pour le pencil
-  
  /------------------------------------------------------------------------------------/
  /****************************************XML*****************************************/
 
@@ -664,6 +761,8 @@ var circle = new Circle(new Point(30, 40), 25);
     savedDrawsXml.push(x.outerHTML);
     i = i + 1;
   } while (typeof x != 'undefined');
+
+    saveDrawXml();
      
   }
 
@@ -694,10 +793,12 @@ var circle = new Circle(new Point(30, 40), 25);
    
   }
 
+
+
   function addXmlSave(itemForm){
 
 
-    savedDrawsXml.push("<action type=\""+itemForm+"\"startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX="+ endcoord.x+" endY=\""+ endcoord.y+"\" ></action>");
+    savedDrawsXml.push("<action type=\""+itemForm+"\" startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX=\""+ endcoord.x+"\" endY=\""+ endcoord.y+"\" ></action>");
 
 
     }
@@ -718,7 +819,6 @@ Paint !
     <th rowspan="4"> <canvas id="gameboard" width="500" height="500" > This is not supported!</canvas> </th>
     <td><form>
   <input type="radio" name="tools" id = "move" value="move" onclick="draw();"> move<br>
-      <br>
   <input type="radio" name="tools" id = "pen" value="pencil" onclick="draw();"> pencil<br>
   <input type="radio" name="tools" id = "line" value="line" onclick="draw();"> line<br>
   <input type="radio" name="tools" id = "circ" value="circle" onclick="draw();"> circle<br>
@@ -749,8 +849,10 @@ Paint !
      <input type="button" value="Undo" onclick="undodraw();" id="undo" />
       <input type="button" value="Redo" onclick="redodraw();" /> </td>
       <input type="button" value="xmlTest" onclick="readXMLfile();" /> </td>
-      <input type="button" value="SaveDraw" onclick="saveDrawXml();" /> </td>
+    <!--  <input type="button" value="SaveDraw" onclick="saveDrawXml();" /> </td> -->
+
   </tr>
+
  
 </table>
 
