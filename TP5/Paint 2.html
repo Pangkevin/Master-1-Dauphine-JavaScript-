@@ -65,7 +65,7 @@ var indexPen = 0;
 
 // Lorsqu'on va contener l'ensemble des cases du tableau pour en faire un fichier XML, il faut bien que le
 //scripte commence par <picture>
-savedDrawsXml.push("<picture>");
+savedDrawsXml.push("&ltpicture&gt;");
 
 // Drag
 
@@ -104,9 +104,9 @@ var img = finishedDraw[length-1];
 ctx.putImageData(img,0,0);
   }
 
-if(savedDrawsXml.pop() == "</picture>"){
+if(savedDrawsXml.pop() == "&lt;/picture&gt;"){
   savedDrawsXml.pop();
-  savedDrawsXml.push( "</picture>");
+  savedDrawsXml.push( "&lt;/picture&gt;");
 }
 
 }
@@ -128,9 +128,6 @@ function redodraw(){
       return 0;
   }
  
-
-  console.log(finishedDraw.length);
-  console.log("++"+finishedDrawUndo.length);
 }
 /-----------------------------------------------------------------------------------/  
  
@@ -175,7 +172,7 @@ function getFirstPoint(e){
       ctx.beginPath();
       ctx.moveTo(startcoord.x, startcoord.y);
 
-      textSavePen += "<action type=\""+"pen"+"\"startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX="+ endcoord.x+" endY=\""+ endcoord.y+"\" ></action>"
+      textSavePen += "&lt;action type=&quot;pen&quot; startX=&quot;"+ startcoord.x+"&quot; startY=&quot;"+startcoord.y+"&quot; strokeStyle=&quot;"+getColorByName(color)+"&quot; lineWidth=&quot;"+document.getElementById("Thick").value+"&quot; &gt;"
   }
 
  else if  (document.getElementById('circ').checked) {
@@ -231,7 +228,7 @@ thick = document.getElementById("Thick").value;
         booleanPen = false;
         drawpen(e);
         ctx.closePath()
-        textSavePen +="</action>"
+        textSavePen +="&lt;/action&gt;"
         savedDrawsXml.push(textSavePen);
 
         // on remet la variable à vide
@@ -243,7 +240,7 @@ thick = document.getElementById("Thick").value;
  
  booleanFin = false;
   saveDraw();
-  saveDrawXml();
+ // saveDrawXml();
  
 }
  
@@ -305,7 +302,7 @@ if(booleanPen){
   ctx.strokeStyle = document.getElementById("color").value;
   ctx.lineWidth= document.getElementById("Thick").value;
 
-  textSavePen += "<point index=\""+indexPen+"\" x=\""+Xend+"\" y=\""+Yend+"\"/>";
+  textSavePen += "&lt;point index=&quot;"+indexPen+"&quot; x=&quot;"+Xend+"&quot; y=&quot;"+Yend+"&quot;/&gt;";
   indexPen++;
 
   ctx.lineTo(Xend, Yend);
@@ -457,13 +454,12 @@ function Decreasethick(){
  
  /-------------------------------------------------------------------------------------/
  /*DRAG & DROP de cercle prédéfini*/
- //window.onload = function() {
-  //drawCircletest(circle);
- //}
-
   var deltaCenter = null;
   var circle;
+  var rectangle;
   var p;
+  var draggingRect;
+  var draggingcircle;
 
 //Creation d'objet possible pour les forme mais pas pour le pencil
  function drawCircletest(circle) {
@@ -478,13 +474,31 @@ function Decreasethick(){
        
       navigatesNodesXML(textXmlSave);
 }
+
+ function drawRecttest(rectangle) {
+    var canvas = document.getElementById('gameboard');
+    var ctx = canvas.getContext('2d');
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.beginPath();
+        // Init radius
+  ctx.rect(rectangle.point.x,rectangle.point.y, rectangle.length,rectangle.width);
+  ctx.stroke();
+  ctx.closePath();
+       
+      navigatesNodesXML(textXmlSave);
+}  
+  
   
 function mouseX(e) {
-return e.clientX - document.getElementById('gameboard').offsetLeft;
+ var rect = canvas.getBoundingClientRect();
+return e.clientX - rect.left;
 }
 
 function mouseY(e) {
-return e.clientY - document.getElementById('gameboard').offsetTop;
+ var rect = canvas.getBoundingClientRect();
+return e.clientY - rect.top;
 }
 
 var Point = function (xx, yy) {
@@ -499,6 +513,18 @@ var Circle = function (point, radius) {
     this.isInside = function (pt) {
         return Math.pow(pt.x - point.x, 2) + Math.pow(pt.y - point.y, 2) <
                                                           Math.pow(radius, 2); 
+    };
+
+    return this;
+}
+
+//Object rectangle
+var Rectangle = function (point, length, width) {
+    this.point = point;
+    this.length = length;
+    this.width = width;
+    this.isInside = function (pt)  {
+        return (pt.X > point.X & pt.X <point.X+width) && (pt.Y > point.Y & pt.Y <point.Y+width); 
     };
 
     return this;
@@ -527,7 +553,13 @@ function move(e) {
 // on demarre à 1 car la premiere cas est dédié à la balise <pictur>
 for(cptTab =1; cptTab < savedDrawsXml.length ; cptTab++){
 
-   stringToXMl = parser.parseFromString(savedDrawsXml[cptTab],"text/xml");
+   stringToXMl = parser.parseFromString(savedDrawsXml[cptTab].replace(/&gt;/g,'>').replace(/&lt;/g,'<').replace(/&quot;/g, '"'),"text/xml");
+    console.log(stringToXMl);
+    console.log(savedDrawsXml[cptTab]);
+  
+     //Doit changer la taille mais ne fonctionne pas      
+    // stringToXMl.getElementsByTagName("action")[0].setAttribute("lineWidth", 5)
+     
 
     console.log(stringToXMl.getElementsByTagName("action")[0].getAttribute("type"));
     actionTag = stringToXMl.getElementsByTagName("action")[0].getAttribute("type");
@@ -535,7 +567,6 @@ for(cptTab =1; cptTab < savedDrawsXml.length ; cptTab++){
        switch (actionTag) {
 
       case 'pen':
-
 
        break;
 
@@ -551,24 +582,20 @@ for(cptTab =1; cptTab < savedDrawsXml.length ; cptTab++){
 
    param2Radius = Math.abs(radiusForCircle);
 
+    var length = endcoord.x-startcoord.x
+    var width = endcoord.y - startcoord.y;
+    ctx.rect(startcoord.x,startcoord.y, length,width);
+
     circle = new Circle(new Point(startcoord.x , startcoord.y), param2Radius);
+    rectangle = new Rectangle(new Point(startcoord.x , startcoord.y), length, width);
 
     if(circle.isInside(p)) {
 
-        // Dessine le cercle en blanc
-     /* isDragging = true;
-      
-
-      drawCircletest(circle);
-
-      isDragging = false;*/
-      
 
       console.log(savedDrawsXml[cptTab]);
 
       deltaCenter = new Point(p.x - circle.point.x, p.y - circle.point.y);
       savedDrawsXml.splice(cptTab, 1);
-      //savedDrawsXml[cptTab] = "";
       restoreXMLBool = true;
       ctx.clearRect(0,0,canvas.width,canvas.height);
       saveDrawXml();
@@ -577,6 +604,7 @@ for(cptTab =1; cptTab < savedDrawsXml.length ; cptTab++){
       restoreXMLBool = false;
       break;
     }
+
     
 }
 
@@ -595,7 +623,18 @@ function drag(e) {
         circle.point.x = (mouseX(e) - deltaCenter.x);
         circle.point.y = (mouseY(e) - deltaCenter.y); 
 
-        drawCircletest(circle);
+/*        rectangle.point.x = (mouseX(e) - deltaCenter.x);
+        rectangle.point.y = (mouseY(e) - deltaCenter.y); */
+        //if(draggingcircle){
+          drawCircletest(circle);
+        /*  draggingcircle = false;
+        }*/
+
+      /*  else if(draggingRect){
+          drawRecttest(rectangle);
+          draggingRect = false;
+        }*/
+        
     }
 
     saveDrawXml();
@@ -604,9 +643,6 @@ function drag(e) {
 //Permet d'arrêter de bouger  
 function stopDragging(e) {
     deltaCenter = null;
-    console.log("+++++++++++++++++++++++++++++++++++++");
-    console.log(textXmlSave);
-    console.log(savedDrawsXml.length)
 }
 
  /------------------------------------------------------------------------------------/
@@ -694,7 +730,7 @@ function stopDragging(e) {
     }else{
 
       var xmlDocConvert;
-      console.log("coco");
+      xml = xml.replace(/&gt;/g,'>').replace(/&lt;/g,'<').replace(/&quot;/g, '"');
       parserXML = new DOMParser();
       xmlDoc = parserXML.parseFromString(xml,"text/xml");
       x = xmlDoc.children[0].children[i];
@@ -709,7 +745,7 @@ function stopDragging(e) {
     startcoord.y = x.getAttribute("startY");
 
     ctx.strokeStyle = getColor(x.getAttribute("strokeStyle"));
-    ctx.lineWidth = getColor(x.getAttribute("lineWidth"));
+    ctx.lineWidth = x.getAttribute("lineWidth");
     ctx.beginPath();
 
     endcoord.x = x.getAttribute("endX");
@@ -769,12 +805,13 @@ function stopDragging(e) {
 }
     // Ajoute x qui contient la balise dans le tableau
     if(!restoreXMLBool){
+    console.log(x.outerHTML);
     savedDrawsXml.push(x.outerHTML);
   }
     i = i + 1;
   } while (typeof x != 'undefined');
 
-   // saveDrawXml();
+    saveDrawXml();
      
   }
 
@@ -786,7 +823,7 @@ function stopDragging(e) {
   var  y = 0;
 
   // Pour toujours avoir la balise de fin du script xml
-  if(savedDrawsXml[savedDrawsXml.length-2] == "</picture>"){
+  if(savedDrawsXml[savedDrawsXml.length-2] == "&lt;/picture&gt;"){
     savedDrawsXml.splice(savedDrawsXml.length-1, 1);
   }
 
@@ -798,17 +835,21 @@ function stopDragging(e) {
 
   }
 
-  textXmlSave += "</picture>"
+  textXmlSave += "&lt;/picture&gt;"
+  var text = textXmlSave
 
   // Faut appuyer sur F12 puis console pour pouvoir voir le xml qu'on a save
+ // console.log(textXmlSave);
+  var div = document.getElementById("XMLDisplay");
+  //var textToDisplay = textXmlSave.replace('&gt;','>').replace('&lt;','<').replace('\\"','&quot;');
+  div.innerHTML=  textXmlSave;
   console.log(textXmlSave);
-   
   }
 
   function addXmlSave(itemForm){
 
 
-    savedDrawsXml.push("<action type=\""+itemForm+"\" startX=\""+ startcoord.x+"\" startY=\""+startcoord.y+"\" strokeStyle=\""+getColorByName(color)+"\" lineWidth=\""+thick+"\" endX=\""+ endcoord.x+"\" endY=\""+ endcoord.y+"\" ></action>");
+    savedDrawsXml.push("&lt;action type=&quot;"+itemForm+"&quot; startX=&quot;"+ startcoord.x+"&quot; startY=&quot;"+startcoord.y+"&quot; strokeStyle=&quot;"+getColorByName(color)+"&quot; lineWidth=&quot;"+thick+"&quot; endX=&quot;"+ endcoord.x+"&quot; endY=&quot;"+ endcoord.y+"\" &gt;&lt;/action&gt;");
 
 
     }
@@ -820,6 +861,7 @@ Paint !
  
  
 <br/>
+  
 <table border="1">
   <tr>
     <th>Canvas</th>
@@ -872,7 +914,11 @@ XML Load
  </tr>     
  
 </table>
+  <br>
+ <div> 
+<p id= "XMLDisplay"></p>
 
+ </div>
 
 </body>
 </html>
