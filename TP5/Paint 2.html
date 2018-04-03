@@ -70,6 +70,7 @@ savedDrawsXml.push("<picture>");
 // Drag
 
 var isDragging = false;
+var restoreXMLBool = false;
 // 
 /-----------------------------------------------------------------------------------/  
  
@@ -337,7 +338,7 @@ if(booleanRect){
   endcoord.x = e.clientX - rect.left;
   endcoord.y = e.clientY - rect.top;
   var length = endcoord.x-startcoord.x
-  var width = endcoord.y - startcoord.x;
+  var width = endcoord.y - startcoord.y;
   ctx.rect(startcoord.x,startcoord.y, length,width);
   ctx.stroke();
   ctx.closePath();
@@ -468,33 +469,14 @@ function Decreasethick(){
  function drawCircletest(circle) {
     var canvas = document.getElementById('gameboard');
     var ctx = canvas.getContext('2d');
-    if(!isDragging){
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      restoreCanvas();
-     
+
       ctx.beginPath();
       ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
       ctx.stroke();
-      ctx.closePath();
-
-    }else{
-
-
-      ctx.beginPath();
-      //drawCircletest(circle);
-      //ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.arc(circle.point.x, circle.point.y, circle.radius, 0, Math.PI*2, true);
-      ctx.fillStyle ="white";
-      ctx.fill();
-   
-      ctx.closePath();
-      imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      saveCanvas();
-      saveDraw();
-     
-    }
+       
+      navigatesNodesXML(textXmlSave);
 }
   
 function mouseX(e) {
@@ -574,15 +556,25 @@ for(cptTab =1; cptTab < savedDrawsXml.length ; cptTab++){
     if(circle.isInside(p)) {
 
         // Dessine le cercle en blanc
-      isDragging = true;
-      drawCircletest(circle);
-      isDragging = false;
+     /* isDragging = true;
+      
 
-      console.log(circle);
+      drawCircletest(circle);
+
+      isDragging = false;*/
+      
+
       console.log(savedDrawsXml[cptTab]);
 
       deltaCenter = new Point(p.x - circle.point.x, p.y - circle.point.y);
       savedDrawsXml.splice(cptTab, 1);
+      //savedDrawsXml[cptTab] = "";
+      restoreXMLBool = true;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      saveDrawXml();
+      navigatesNodesXML(textXmlSave);
+      console.log(textXmlSave);
+      restoreXMLBool = false;
       break;
     }
     
@@ -604,14 +596,17 @@ function drag(e) {
         circle.point.y = (mouseY(e) - deltaCenter.y); 
 
         drawCircletest(circle);
-
     }
+
+    saveDrawXml();
 }
 
 //Permet d'arrêter de bouger  
 function stopDragging(e) {
     deltaCenter = null;
-      
+    console.log("+++++++++++++++++++++++++++++++++++++");
+    console.log(textXmlSave);
+    console.log(savedDrawsXml.length)
 }
 
  /------------------------------------------------------------------------------------/
@@ -629,7 +624,8 @@ function stopDragging(e) {
       }
   };
   // C'est ici qu'on met le nom du fichier XML
-  xhttp.open("GET", "testSave.xml", true);
+
+  xhttp.open("GET", document.getElementById("XMLLoad").value, true);
   xhttp.send();
 
  }
@@ -692,8 +688,20 @@ function stopDragging(e) {
   // Parcours le dom
   do {
 
-    console.log(x);
-    x = xmlDoc.getElementsByTagName("action")[i];
+    if(!restoreXMLBool){
+
+      x = xmlDoc.getElementsByTagName("action")[i];
+    }else{
+
+      var xmlDocConvert;
+      console.log("coco");
+      parserXML = new DOMParser();
+      xmlDoc = parserXML.parseFromString(xml,"text/xml");
+      x = xmlDoc.children[0].children[i];
+      //xmlDocConvert = xmlDoc.getElementsByTagName("action")[i];
+      console.log(x);
+    }
+    
 
     // get l'attribut type pour avoir le type de dessin
     expr = x.getAttribute("type");
@@ -747,8 +755,10 @@ function stopDragging(e) {
       //Dans la balise action de PEN, il y a beaucoup de balise fils, donc çela va nous permettre de les parcourir
 
       ctx.moveTo(x.children[0].getAttribute("startX"), x.children[0].getAttribute("startY"));
+      ctx.beginPath();
       for(var j =1; j <= x.childElementCount-1; j++){
       
+
       ctx.lineTo(x.children[j].getAttribute("x"), x.children[j].getAttribute("y"));
       ctx.stroke();
 
@@ -758,11 +768,13 @@ function stopDragging(e) {
       saveDraw();
 }
     // Ajoute x qui contient la balise dans le tableau
+    if(!restoreXMLBool){
     savedDrawsXml.push(x.outerHTML);
+  }
     i = i + 1;
   } while (typeof x != 'undefined');
 
-    saveDrawXml();
+   // saveDrawXml();
      
   }
 
@@ -793,8 +805,6 @@ function stopDragging(e) {
    
   }
 
-
-
   function addXmlSave(itemForm){
 
 
@@ -816,7 +826,7 @@ Paint !
     <th>Tools</th>
   </tr>
   <tr>
-    <th rowspan="4"> <canvas id="gameboard" width="500" height="500" > This is not supported!</canvas> </th>
+    <th rowspan="5"> <canvas id="gameboard" width="500" height="500" > This is not supported!</canvas> </th>
     <td><form>
   <input type="radio" name="tools" id = "move" value="move" onclick="draw();"> move<br>
   <input type="radio" name="tools" id = "pen" value="pencil" onclick="draw();"> pencil<br>
@@ -848,11 +858,18 @@ Paint !
     <td><input type="button" value="Clear" onclick="clearboard();" />
      <input type="button" value="Undo" onclick="undodraw();" id="undo" />
       <input type="button" value="Redo" onclick="redodraw();" /> </td>
-      <input type="button" value="xmlTest" onclick="readXMLfile();" /> </td>
-    <!--  <input type="button" value="SaveDraw" onclick="saveDrawXml();" /> </td> -->
 
   </tr>
-
+<tr>
+  <td>
+XML Load
+      <input type="text" id="XMLLoad">
+ <br>
+ 
+  <input type="button" value="Load" onclick="readXMLfile();" /> 
+      <input type="button" value="SaveDraw" onclick="saveDrawXml();" />
+       </td> 
+ </tr>     
  
 </table>
 
